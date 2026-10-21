@@ -128,36 +128,52 @@ svg.mapsvg { width: 100%; height: auto; max-height: 62vh; display: block; border
 .stat { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 12px 0; font-size: 15px; }
 .stat span:nth-child(odd) { color: var(--muted); }
 .stat span:nth-child(even) { font-weight: 600; text-align: right; }
-.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
 .tab { background: none; border: 0; border-radius: 10px; padding: 8px 4px; min-height: 48px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .tab[aria-selected="true"] { color: var(--accent); background: var(--card2); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 90px; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 20; max-width: 90vw; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30; display: grid; place-items: center; padding: 16px; }
 .modal .card { max-width: 420px; width: 100%; }
 
-/* narrow: one panel at a time, tab bar at the bottom (cover screen) */
+/* the world */
+.p-world { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--line); background: #2b9db3; min-height: 380px; }
+.worldbox { position: absolute; inset: 0; }
+.worldcv { display: block; touch-action: none; cursor: pointer; width: 100%; height: 100%; }
+.whud { position: absolute; left: 10px; top: 10px; right: 10px; pointer-events: none; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.wlabel { background: rgba(15,26,32,.78); color: #fff; padding: 4px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.whint { background: rgba(255,255,255,.92); color: #1d2a33; padding: 6px 12px; border-radius: 10px; font-size: 13px; transition: opacity .6s; max-width: 280px; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(8,16,22,.38); z-index: 3; }
+.sheetin { background: var(--card); width: 100%; max-height: 82%; overflow: auto; border-radius: 20px 20px 0 0; padding: 18px; box-shadow: var(--shadow); animation: rise .22s ease-out; }
+.sheetin h3 { font-size: 22px; margin-bottom: 8px; }
+.sheetin p { margin: 0 0 10px; font-size: 17px; }
+.sheetin p.note { font-size: 14px; }
+.card.life, .card.logp { }
+#app[data-layout="narrow"] .panels { padding-bottom: 84px; }
 #app[data-layout="narrow"] .panels > section { display: none; }
 #app[data-layout="narrow"] .panels > section.on { display: block; }
+#app[data-layout="narrow"] .p-world { height: calc(100vh - 160px); height: calc(100dvh - 160px); }
 #app[data-layout="narrow"] .pills .pill.opt { display: none; }
 #app[data-layout="narrow"] .acts { grid-template-columns: 1fr; }
-#app[data-layout="narrow"] .card { padding: 16px; }
-/* mid: unfolded Fold, two columns, no tab bar */
 #app[data-layout="mid"] .tabs, #app[data-layout="wide"] .tabs { display: none; }
-#app[data-layout="mid"] .panels { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); padding-bottom: 30px; }
-#app[data-layout="mid"] .panels > section.p-story { grid-column: 1; grid-row: 1 / span 3; }
+#app[data-layout="mid"] .panels, #app[data-layout="wide"] .panels { padding-bottom: 20px; }
+#app[data-layout="mid"] .panels { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 #app[data-layout="mid"] .panels > section { display: block; }
+#app[data-layout="mid"] .p-world { grid-column: 1; grid-row: 1 / span 2; height: calc(100vh - 100px); height: calc(100dvh - 100px); }
+#app[data-layout="mid"] .p-life { grid-column: 2; grid-row: 1; }
+#app[data-layout="mid"] .p-log { grid-column: 2; grid-row: 2; }
+#app[data-layout="mid"] .sheet, #app[data-layout="wide"] .sheet { align-items: center; }
+#app[data-layout="mid"] .sheetin, #app[data-layout="wide"] .sheetin { border-radius: 20px; max-width: 540px; max-height: 88%; width: calc(100% - 32px); }
 #app[data-layout="mid"] .grid.presets { grid-template-columns: 1fr 1fr; }
-/* wide: PC, three columns */
-#app[data-layout="wide"] .panels { grid-template-columns: 300px minmax(0, 1fr) 380px; padding-bottom: 30px; }
+#app[data-layout="mid"] .form { grid-template-columns: 1fr 1fr; }
+#app[data-layout="wide"] .panels { grid-template-columns: minmax(0, 1fr) 360px; }
 #app[data-layout="wide"] .panels > section { display: block; }
-#app[data-layout="wide"] .panels > section.p-life { grid-column: 1; grid-row: 1 / span 2; }
-#app[data-layout="wide"] .panels > section.p-story { grid-column: 2; grid-row: 1 / span 2; }
-#app[data-layout="wide"] .panels > section.p-map { grid-column: 3; grid-row: 1; }
-#app[data-layout="wide"] .panels > section.p-log { grid-column: 3; grid-row: 2; }
+#app[data-layout="wide"] .p-world { grid-column: 1; grid-row: 1 / span 2; height: calc(100vh - 100px); height: calc(100dvh - 100px); }
+#app[data-layout="wide"] .p-life { grid-column: 2; grid-row: 1; }
+#app[data-layout="wide"] .p-log { grid-column: 2; grid-row: 2; }
 #app[data-layout="wide"] .grid.presets { grid-template-columns: 1fr 1fr 1fr; }
 #app[data-layout="wide"] .form { grid-template-columns: 1fr 1fr; }
-#app[data-layout="mid"] .form { grid-template-columns: 1fr 1fr; }
 #app[data-layout="wide"] .start { padding-top: 50px; }
+#app[data-layout="wide"] .log, #app[data-layout="mid"] .log { max-height: 32vh; }
 @media (prefers-reduced-motion: no-preference) { .card { animation: rise .25s ease-out; } @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } }
 </style>
 
@@ -169,6 +185,8 @@ svg.mapsvg { width: 100%; height: auto; max-height: 62vh; display: block; border
 <script src="js/events_adult.js"></script>
 <script src="js/events_street.js"></script>
 <script src="js/actions.js"></script>
+<script src="js/world.js"></script>
 <script src="js/ui.js"></script>
+
 </body>
 </html>

@@ -767,6 +767,7 @@
   };
   G.api = api;
   G.u = api;
+  G.tick = function (s, months) { advance(s, months); };
   G.stage = stage;
   G.age = age;
   G.yr = yr;

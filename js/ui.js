@@ -3,7 +3,7 @@
   'use strict';
   var G = window.GAME;
   var root = document.getElementById('app');
-  var app = { screen: 'boot', tab: 'story', S: null, meta: { past: [], lockUntil: 0 }, sel: null, custom: false, modal: null, darkOpen: false, toast: '', recorded: false, form: null };
+  var app = { screen: 'boot', tab: 'world', S: null, meta: { past: [], lockUntil: 0 }, sel: null, custom: false, modal: null, darkOpen: false, toast: '', recorded: false, form: null };
   var store = { db: null, uid: null, chain: Promise.resolve(), timer: null };
   window.__app = app;
 
@@ -126,8 +126,10 @@
     app.S = G.newState(spec);
     app.recorded = false;
     app.screen = 'game';
-    app.tab = 'story';
+    app.tab = 'world';
     app.sel = null;
+    app.place = null;
+    G.world.reset();
     app.modal = null;
     saveSoon();
     render();
@@ -156,14 +158,10 @@
   }
 
   // ---------- game panels ----------
-  function groupOrder() {
-    return [['life', 'Time'], ['school', 'School'], ['work', 'Work'], ['money', 'Money and home'], ['people', 'People'], ['body', 'Body'], ['risk', 'The rough side']];
-  }
-  function storyHtml(s) {
+  function cardHtml(s) {
     var v = G.view(s);
-    var h = '<section class="p-story card story' + (app.tab === 'story' ? '' : '') + '">';
-    if (!v) return h + '</section>';
-    h += '<div class="stagefoot">' + esc(G.stage(G.age(s))) + ' · ' + G.yr(s) + '</div>';
+    if (!v || v.kind === 'free') return '';
+    var h = '<div class="stagefoot">' + esc(G.stage(G.age(s))) + ' · ' + G.yr(s) + '</div>';
     if (v.kind === 'event') {
       h += '<h3>' + esc(v.title) + '</h3><p>' + esc(v.text) + '</p><div class="choices">';
       v.choices.forEach(function (c, i) {
@@ -174,32 +172,39 @@
       h += '<h3>' + esc(v.title) + '</h3><p>' + esc(v.text) + '</p>';
       if (v.chips && v.chips.length) h += '<div class="chips">' + v.chips.map(function (c) { return '<span class="chip ' + c.k + '">' + esc(c.t) + '</span>'; }).join('') + '</div>';
       h += '<div class="choices"><button class="choice" data-a="next" style="justify-content:center">' + (v.dead ? 'See how it ended' : 'Continue') + '</button></div>';
-    } else if (v.kind === 'free') {
-      h += freeHtml(s);
     } else if (v.kind === 'ending') {
       h += endingHtml(s);
     }
-    return h + '</section>';
+    return h;
   }
-  function freeHtml(s) {
-    var acts = G.availableActions(s);
-    var h = '<div class="free"><h3>What now?</h3><p class="note">Nothing is forcing your hand. Pick what to do with the next stretch of your life, or open the Map to go out.</p>';
-    groupOrder().forEach(function (g) {
-      var list = acts.filter(function (a) { return a.group === g[0]; });
-      if (!list.length) return;
-      h += '<div class="grp"><h4>' + g[1] + '</h4><div class="acts">' + list.map(actHtml(s)).join('') + '</div></div>';
-    });
-    var dark = acts.filter(function (a) { return a.group === 'reckless'; });
-    if (dark.length) {
-      h += '<div class="grp"><details class="dark"' + (app.darkOpen ? ' open' : '') + '><summary data-a="dark">Dark roads</summary><p class="note">These are the choices that end lives. You always get a chance to back out, but not always a way out afterward.</p><div class="acts">' + dark.map(actHtml(s, true)).join('') + '</div></details></div>';
-    }
-    return h + '</div>';
-  }
-  function actHtml(s, dark) {
+  function actBtn(s, dark) {
     return function (a) {
       var label = typeof a.label === 'function' ? a.label(s) : a.label;
-      return '<button class="act' + (dark ? ' dark' : '') + '" data-a="act:' + a.id + '">' + esc(label) + (a.hint ? '<small>' + esc(a.hint) + '</small>' : '') + '</button>';
+      return '<button class="act' + (dark ? ' dark' : '') + '" data-a="pact:' + a.id + '">' + esc(label) + (a.hint ? '<small>' + esc(a.hint) + '</small>' : '') + '</button>';
     };
+  }
+  function placeHtml(s) {
+    var W = G.world, pid = app.place;
+    if (pid === 'move') {
+      var h = '<h3>Move to another part of Miami</h3><p class="note">Rent changes with the area, and so does the kind of trouble that finds you.</p><div class="acts">';
+      G.AREA_ORDER.forEach(function (k) {
+        var a = G.AREAS[k];
+        h += '<button class="act" data-a="moveto:' + k + '"' + (k === s.area ? ' disabled' : '') + '>' + esc(a.name) + '<small>Rent about ' + $(a.rent) + (a.risk >= 3 ? ' · rough' : a.risk === 0 ? ' · calm' : '') + '</small></button>';
+      });
+      return h + '</div><div class="row" style="margin-top:14px"><button class="btn ghost small" data-a="place-close">Back</button></div>';
+    }
+    var p = W.placeById(pid);
+    if (!p) return '';
+    var acts = W.placeActions(s, pid);
+    var list = acts.filter(function (a) { return a.group !== 'reckless'; });
+    var dark = acts.filter(function (a) { return a.group === 'reckless'; });
+    var h2 = '<div class="stagefoot">' + esc(p.emoji + ' ' + p.label(s)) + '</div><h3>' + esc(p.label(s)) + '</h3><p>' + esc(p.blurb(s)) + '</p>';
+    var out = '';
+    if (list.length) out += '<div class="acts">' + list.map(actBtn(s, false)).join('') + '</div>';
+    if (pid === 'realtor' && G.age(s) >= 18) out += '<div class="acts" style="margin-top:8px"><button class="act" data-a="move-open">Move to another part of Miami<small>Change where you live</small></button></div>';
+    if (dark.length) out += '<details class="dark" style="margin-top:12px"' + (app.darkOpen ? ' open' : '') + '><summary data-a="dark">Dark roads</summary><p class="note">These are the choices that end lives. You always get a chance to back out, but not always a way out afterward.</p><div class="acts">' + dark.map(actBtn(s, true)).join('') + '</div></details>';
+    if (!out) out = '<p class="note">' + esc(p.empty) + '</p>';
+    return h2 + out + '<div class="row" style="margin-top:14px"><button class="btn ghost small" data-a="place-close">Leave</button></div>';
   }
   function endingHtml(s) {
     var m = G.summary(s);
@@ -257,44 +262,21 @@
       return '<li class="' + (l.k === 'big' || l.k === 'milestone' ? 'big' : '') + '"><b>' + l.a + '</b><span>' + esc(l.t) + '</span></li>';
     }).join('') + '</ul></section>';
   }
-  function mapHtml(s) {
-    var sel = app.sel && G.AREAS[app.sel] ? G.AREAS[app.sel] : G.area(s);
-    var h = '<section class="p-map card map"><h3>Miami</h3>';
-    h += '<svg class="mapsvg" viewBox="0 0 390 450" role="img" aria-label="Map of Miami areas">';
-    h += '<path d="M24 8 L246 8 L258 226 L222 300 L206 442 L24 442 Z" fill="var(--land)"/>';
-    h += '<path d="M288 100 L336 112 L342 268 L298 258 Z" fill="var(--land)"/>';
-    h += '<path d="M180 124 L302 170 M190 192 L302 170" stroke="var(--road)" stroke-width="5" stroke-linecap="round" fill="none"/>';
-    G.AREA_ORDER.forEach(function (k) {
-      var a = G.AREAS[k];
-      var cls = 'node' + (k === s.area ? ' here' : '') + (sel.id === k ? ' sel' : '') + (a.risk >= 3 ? ' rough' : '');
-      var tx = a.lx === 0 ? a.x : a.lx === -1 ? a.x - 16 : a.x + 16;
-      var ty = a.lx === 0 ? a.y - 20 : a.y + 5;
-      var anc = a.lx === 0 ? 'middle' : a.lx === -1 ? 'end' : 'start';
-      h += '<g class="' + cls + '" data-a="sel:' + k + '" tabindex="0" role="button" aria-label="' + esc(a.name) + '"><circle cx="' + a.x + '" cy="' + a.y + '" r="12"/><circle cx="' + a.x + '" cy="' + a.y + '" r="22" fill="transparent" stroke="none"/>';
-      h += '<text x="' + tx + '" y="' + ty + '" text-anchor="' + anc + '">' + esc(a.short) + '</text></g>';
-    });
-    h += '</svg>';
-    var free = s.cur && s.cur.kind === 'free';
-    h += '<div class="mapinfo"><h4>' + esc(sel.name) + (sel.id === s.area ? ' · you live here' : '') + '</h4><p>' + esc(sel.flavor) + '</p>';
-    h += '<div class="facts"><span class="tagx">Rent about ' + $(sel.rent) + '</span><span class="tagx' + (sel.risk >= 3 ? ' bad' : '') + '">' + ['Calm', 'Average', 'Busy', 'Rough'][sel.risk] + '</span><span class="tagx">Nightlife ' + ['none', 'quiet', 'lively', 'wild'][sel.night] + '</span></div>';
-    h += '<div class="row"><button class="btn small" data-a="out-day"' + (free ? '' : ' disabled') + '>Go out by day</button><button class="btn small" data-a="out-night"' + (free && G.age(s) >= 16 ? '' : ' disabled') + '>Go out at night</button>';
-    if (sel.id !== s.area) h += '<button class="btn small ghost" data-a="move"' + (free && G.age(s) >= 18 ? '' : ' disabled') + '>Move here</button>';
-    h += '</div>' + (free ? '' : '<p class="note" style="margin-top:8px">Finish what is in front of you first.</p>') + '</div></section>';
-    return h;
-  }
   function gameHtml() {
     var s = app.S;
-    var panels = [['story', storyHtml(s)], ['map', mapHtml(s)], ['life', lifeHtml(s)], ['log', logHtml(s)]];
+    var cur = s.cur && s.cur.kind;
+    var sheet = '';
+    if (cur && cur !== 'free') sheet = '<div class="sheet"><div class="sheetin">' + cardHtml(s) + '</div></div>';
+    else if (app.place) sheet = '<div class="sheet"><div class="sheetin">' + placeHtml(s) + '</div></div>';
     var h = '<div class="game"><header class="top"><div class="who"><h2>' + esc(s.name) + '</h2><small>' + esc(G.stage(G.age(s))) + ' · ' + G.yr(s) + '</small></div><div class="pills">';
     h += '<span class="pill">Age ' + G.age(s) + '</span><span class="pill' + (s.money < 0 ? ' neg' : '') + '">' + $(s.money) + '</span>';
-    h += '<span class="pill opt">' + esc(G.area(s).short) + '</span>';
+    if (s.job) h += '<span class="pill opt">' + esc(G.jobTitle(s)) + '</span>';
     h += '<button class="menu-btn" data-a="menu" aria-label="Menu">☰</button></div></header><main class="panels">';
-    panels.forEach(function (p) {
-      var html = p[1].replace('<section class="', '<section data-panel="' + p[0] + '" class="' + (app.tab === p[0] ? 'on ' : ''));
-      h += html;
-    });
+    h += '<section data-panel="world" class="p-world' + (app.tab === 'world' ? ' on' : '') + '"><div id="wmount"></div>' + sheet + '</section>';
+    h += lifeHtml(s).replace('<section class="', '<section data-panel="life" class="' + (app.tab === 'life' ? 'on ' : ''));
+    h += logHtml(s).replace('<section class="', '<section data-panel="log" class="' + (app.tab === 'log' ? 'on ' : ''));
     h += '</main><nav class="tabs" role="tablist">';
-    [['story', 'Story'], ['map', 'Map'], ['life', 'Life'], ['log', 'History']].forEach(function (t) {
+    [['world', 'Miami'], ['life', 'Life'], ['log', 'History']].forEach(function (t) {
       h += '<button class="tab" role="tab" aria-selected="' + (app.tab === t[0]) + '" data-a="tab:' + t[0] + '">' + t[1] + '</button>';
     });
     h += '</nav>';
@@ -306,12 +288,23 @@
   }
 
   // ---------- render ----------
+  var cb = {
+    openPlace: function (id) { app.place = id; saveSoon(); render(); },
+    changed: function () { app.place = null; saveSoon(); render(); },
+    save: function () { saveSoon(); }
+  };
   function render() {
     layout();
     if (app.screen === 'boot') { root.innerHTML = '<div class="start"><div class="brand">Life <span>Choices</span></div></div>'; return; }
     if (app.screen === 'start') { root.innerHTML = startHtml(); return; }
     if (app.S && app.S.cur && app.S.cur.kind === 'ending' && !app.recorded) recordEnding();
+    var keep = root.querySelector('.sheetin');
+    var top = keep ? keep.scrollTop : 0;
     root.innerHTML = gameHtml();
+    var mount = document.getElementById('wmount');
+    if (mount) mount.appendChild(G.world.attach(app, cb));
+    var sh = root.querySelector('.sheetin');
+    if (sh && top && app.keepScroll) sh.scrollTop = top;
   }
   function recordEnding() {
     app.recorded = true;
@@ -321,11 +314,11 @@
     clearSave();
     saveSoon();
   }
-  function toStory() {
-    app.tab = 'story';
+  function after() {
+    app.place = null;
+    app.tab = 'world';
     saveSoon();
     render();
-    if (root.getAttribute('data-layout') === 'narrow') window.scrollTo(0, 0);
   }
 
   // ---------- input ----------
@@ -347,30 +340,15 @@
     if (cmd === 'menu') { app.modal = 'menu'; render(); return; }
     if (cmd === 'close') { app.modal = null; render(); return; }
     if (cmd === 'tab') { app.tab = arg; render(); window.scrollTo(0, 0); return; }
-    if (cmd === 'sel') { app.sel = arg; render(); return; }
     if (!s) return;
-    if (cmd === 'choose') { if (G.choose(s, +arg)) toStory(); else { flash('You cannot afford that.'); } return; }
-    if (cmd === 'next') { G.next(s); toStory(); return; }
-    if (cmd === 'act') { G.doAction(s, arg); toStory(); return; }
-    if (cmd === 'out-day' || cmd === 'out-night') {
-      var ar = app.sel || s.area;
-      G.goOut(s, ar, cmd === 'out-night');
-      toStory();
-      return;
-    }
-    if (cmd === 'move') { G.moveTo(s, app.sel); toStory(); return; }
+    if (cmd === 'place-close') { app.place = null; render(); return; }
+    if (cmd === 'move-open') { app.place = 'move'; render(); return; }
+    if (cmd === 'moveto') { if (G.moveTo(s, arg)) after(); return; }
+    if (cmd === 'pact') { if (G.doAction(s, arg)) after(); return; }
+    if (cmd === 'choose') { if (G.choose(s, +arg)) after(); else flash('You cannot afford that.'); return; }
+    if (cmd === 'next') { G.next(s); after(); return; }
   });
-  root.addEventListener('keydown', function (ev) {
-    if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('g[data-a]')) { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
-  });
-  root.addEventListener('input', function (ev) {
-    if (app.screen === 'start' && ev.target.id === 'f-age') {
-      var before = app.form ? app.form.age : 18;
-      readForm();
-      var crossed = (before >= 18) !== (app.form.age >= 18) || (before >= 16) !== (app.form.age >= 16);
-      if (crossed && document.activeElement === ev.target) { /* wait for blur to re-render so typing is not interrupted */ }
-    }
-  });
+  root.addEventListener('input', function () { });
   root.addEventListener('change', function (ev) {
     if (app.screen === 'start' && app.custom && ev.target.closest('.form')) { readForm(); render(); }
   });
@@ -388,9 +366,8 @@
     var saved = await readJson('save', 'ml_save');
     if (saved && saved.v) {
       app.S = G.migrate(saved);
-      app.recorded = !!(app.S.cur && app.S.cur.kind === 'ending') && false;
-      app.screen = app.S.dead ? 'start' : 'game';
-      if (app.S.dead) app.S = null;
+      app.recorded = false;
+      if (app.S.dead) { app.S = null; app.screen = 'start'; } else app.screen = 'game';
     } else {
       app.screen = 'start';
     }
