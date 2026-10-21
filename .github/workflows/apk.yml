@@ -1,0 +1,40 @@
+name: Build Android app
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Create Capacitor shell that loads the live game
+        run: |
+          mkdir shell && cd shell
+          npm init -y >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 >/dev/null
+          mkdir www
+          echo '<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;padding:24px"><h2>Life Choices</h2><p>You need an internet connection to load the game.</p>' > www/index.html
+          cat > capacitor.config.json <<'JSON'
+          {"appId":"com.lancehayes.lifechoices","appName":"Life Choices","webDir":"www","server":{"url":"https://lhayes037-cloud.github.io/life-choices/","cleartext":false}}
+          JSON
+          npx cap add android >/dev/null
+      - name: Build debug APK
+        run: |
+          cd shell/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Publish APK as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp shell/android/app/build/outputs/apk/debug/app-debug.apk life-choices.apk
+          gh release delete apk-latest -y --cleanup-tag || true
+          gh release create apk-latest life-choices.apk --title "Life Choices app" --notes "Install this on your Android phone."
