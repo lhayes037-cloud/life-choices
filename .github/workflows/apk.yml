@@ -26,6 +26,26 @@ jobs:
           {"appId":"com.lancehayes.lifechoices","appName":"Life Choices","webDir":"www","server":{"url":"https://lhayes037-cloud.github.io/life-choices/","cleartext":false}}
           JSON
           npx cap add android >/dev/null
+      - name: Use the Life Choices icon
+        run: |
+          pip install pillow >/dev/null
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          import os, shutil
+          src = Image.open('icon-1024.png').convert('RGBA')
+          res = 'shell/android/app/src/main/res'
+          shutil.rmtree(res + '/mipmap-anydpi-v26', ignore_errors=True)
+          for d, s in [('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)]:
+              folder = f'{res}/mipmap-{d}'
+              im = src.resize((s, s), Image.LANCZOS)
+              for name in ('ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png'):
+                  out = im
+                  if name == 'ic_launcher_round.png':
+                      mask = Image.new('L', (s, s), 0)
+                      ImageDraw.Draw(mask).ellipse([0, 0, s-1, s-1], fill=255)
+                      out = Image.new('RGBA', (s, s), (0, 0, 0, 0)); out.paste(im, (0, 0), mask)
+                  out.save(f'{folder}/{name}')
+          PY
       - name: Build debug APK
         run: |
           cd shell/android
