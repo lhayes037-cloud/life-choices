@@ -19,13 +19,22 @@ jobs:
         run: |
           mkdir shell && cd shell
           npm init -y >/dev/null
-          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor-community/speech-recognition@6 >/dev/null
           mkdir www
           echo '<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;padding:24px"><h2>Life Choices</h2><p>You need an internet connection to load the game.</p>' > www/index.html
           cat > capacitor.config.json <<'JSON'
           {"appId":"com.lancehayes.lifechoices","appName":"Life Choices","webDir":"www","server":{"url":"https://lhayes037-cloud.github.io/life-choices/","cleartext":false}}
           JSON
           npx cap add android >/dev/null
+          npx cap sync android >/dev/null
+          M=android/app/src/main/AndroidManifest.xml
+          python3 - "$M" <<'PY'
+          import sys
+          p = sys.argv[1]; t = open(p).read()
+          if 'RECORD_AUDIO' not in t:
+              t = t.replace('</manifest>', '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <queries><intent><action android:name="android.speech.RecognitionService"/></intent></queries>\n</manifest>')
+          open(p, 'w').write(t)
+          PY
       - name: Use the Life Choices icon
         run: |
           pip install pillow >/dev/null

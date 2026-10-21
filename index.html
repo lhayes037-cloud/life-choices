@@ -175,19 +175,28 @@ svg.mapsvg { width: 100%; height: auto; max-height: 62vh; display: block; border
 #app[data-layout="wide"] .form { grid-template-columns: 1fr 1fr; }
 #app[data-layout="wide"] .start { padding-top: 50px; }
 #app[data-layout="wide"] .log, #app[data-layout="mid"] .log { max-height: 32vh; }
+/* voice */
+.vbar { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.vrow { display: flex; gap: 8px; align-items: center; }
+.vin { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 46px; color: var(--ink); }
+.mic { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 20px; }
+.mic.on { background: var(--coral); animation: pulse 1s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217,83,63,.5); } 100% { box-shadow: 0 0 0 14px rgba(217,83,63,0); } }
+.vyes { border-color: var(--accent); }
+.vbar .note { margin: 8px 0 0; }
+.wmic { position: absolute; right: 12px; top: 10px; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 20px; z-index: 2; box-shadow: var(--shadow); }
 @media (prefers-reduced-motion: no-preference) { .card { animation: rise .25s ease-out; } @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } }
 </style>
 
 </head><body>
 <div id="app" data-layout="narrow"></div>
-<script src="js/data.js?v=1792607850"></script>
-<script src="js/engine.js?v=1792607850"></script>
-<script src="js/events_early.js?v=1792607850"></script>
-<script src="js/events_adult.js?v=1792607850"></script>
-<script src="js/events_street.js?v=1792607850"></script>
-<script src="js/actions.js?v=1792607850"></script>
-<script src="js/world.js?v=1792607850"></script>
-<script src="js/ui.js?v=1792607850"></script>
-
-</body>
-</html>
+<script src="js/data.js?v=1792611998"></script>
+<script src="js/engine.js?v=1792611998"></script>
+<script src="js/events_early.js?v=1792611998"></script>
+<script src="js/events_adult.js?v=1792611998"></script>
+<script src="js/events_street.js?v=1792611998"></script>
+<script src="js/actions.js?v=1792611998"></script>
+<script src="js/world.js?v=1792611998"></script>
+<script src="js/voice.js?v=1792611998"></script>
+<script src="js/ui.js?v=1792611998"></script>
+</body></html>

@@ -81,6 +81,13 @@
       blurb: function () { return 'People who look at you a little too long. Some of them are offering things.'; },
       empty: 'Nobody here wants anything from you right now.' }
   ];
+  var KEYS = {
+    home: 'home house apartment sleep bed rest family relax', work: 'work job office career hire apply boss paycheck money quit',
+    school: 'school class college university study learn campus exam graduate degree', clinic: 'doctor hospital clinic checkup health sick medical',
+    realtor: 'realtor move moving buy house real estate neighborhood', casino: 'casino gamble gambling bet slots poker lucky',
+    gunshop: 'gun guns weapon pistol protection firearm', club: 'club nightclub party dance date meet drinks night girlfriend boyfriend',
+    pier: 'beach pier ocean sand swim sun water relax date', corner: 'corner street crew gang hustle hood rob steal crime dealer'
+  };
   var MAPPED = {};
   PLACES.forEach(function (p) { p.ids.forEach(function (i) { MAPPED[i] = true; }); });
   function placeById(id) { for (var i = 0; i < PLACES.length; i++) if (PLACES[i].id === id) return PLACES[i]; return null; }
@@ -211,7 +218,7 @@
 
   // ---------- the world object ----------
   var world = { el: null, app: null, cb: null };
-  var cv, ctx, hud, label, hint;
+  var cv, ctx, hud, label, hint, mic;
   var cam = { x: 0, y: 0 }, vw = 360, vh = 600, dpr = 1, k = 1;
   var pl = { x: 0, y: 0, dir: 1, ph: 0, moving: false };
   var keys = {}, target = null, route = [], dragging = false, inside = null, lastArea = null, lastSave = 0, lastLabel = 0, hintUntil = 0, time = 0, pulse = 0;
@@ -229,6 +236,14 @@
     hint = document.createElement('div');
     hint.className = 'whint';
     hint.textContent = 'Tap the map to walk. Walk into a building to go inside.';
+    mic = document.createElement('button');
+    mic.className = 'wmic';
+    mic.type = 'button';
+    mic.setAttribute('aria-label', 'Say where to go');
+    mic.textContent = '🎤';
+    mic.addEventListener('click', function (e) { e.stopPropagation(); if (world.cb && world.cb.micMap) world.cb.micMap(); });
+    mic.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    el.appendChild(mic);
     hud.appendChild(label);
     hud.appendChild(hint);
     el.appendChild(cv);
@@ -562,6 +577,25 @@
     if (!started) { started = true; requestAnimationFrame(frame); }
     setTimeout(resize, 0);
     return world.el;
+  };
+  // "go to the beach", "I want a job": walk to the place that fits best
+  world.goToText = function (text) {
+    var s = world.app && world.app.S;
+    if (!s) return null;
+    var words = String(text || '').toLowerCase().replace(/[^a-z ]+/g, ' ').split(/\s+/);
+    var best = null, bs = 0;
+    PLACES.forEach(function (p) {
+      var keys = (KEYS[p.id] || '').split(' '), sc = 0;
+      words.forEach(function (w) { if (w && keys.indexOf(w) >= 0) sc += (w === p.id || w === p.label(s).toLowerCase()) ? 2 : 1; });
+      if (p.label(s).toLowerCase().split(' ').every(function (w) { return words.indexOf(w) >= 0; })) sc += 2;
+      if (sc > bs) { bs = sc; best = p; }
+    });
+    if (!best || !canMove(false)) return null;
+    var pp = placePos(best, s);
+    var dest = clampWalk([pp[0], pp[1] + 34]);
+    target = dest; route = routeTo(dest); keys = {};
+    if (inside === best.id) { world.cb.openPlace(best.id); }
+    return best.label(s);
   };
   world.places = PLACES;
   world.placeById = placeById;

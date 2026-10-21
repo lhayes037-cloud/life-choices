@@ -157,13 +157,81 @@
     return spec;
   }
 
+  // ---------- voice and typed input ----------
+  function voiceItems(s) {
+    var items = [];
+    var cur = s.cur && s.cur.kind;
+    if (cur === 'event') {
+      var v = G.view(s);
+      v.choices.forEach(function (c, i) { if (!c.disabled) items.push({ label: c.label, text: c.label + ' ' + (c.hint || ''), cmd: 'choose:' + i }); });
+    } else if (cur === 'free' && app.place === 'move') {
+      G.AREA_ORDER.forEach(function (k) { if (k !== s.area) items.push({ label: G.AREAS[k].name, text: G.AREAS[k].name + ' ' + G.AREAS[k].short, cmd: 'moveto:' + k }); });
+      items.push({ label: 'Back', text: 'back leave', cmd: 'place-close' });
+    } else if (cur === 'free' && app.place) {
+      G.world.placeActions(s, app.place).forEach(function (a) {
+        var label = typeof a.label === 'function' ? a.label(s) : a.label;
+        items.push({ label: label, text: label + ' ' + (a.hint || ''), cmd: 'pact:' + a.id });
+      });
+      if (app.place === 'realtor' && G.age(s) >= 18) items.push({ label: 'Move to another part of Miami', text: 'move moving another part neighborhood area', cmd: 'move-open' });
+      items.push({ label: 'Leave', text: 'leave exit back go away', cmd: 'place-close' });
+    }
+    return items;
+  }
+  function voiceBarHtml() {
+    var v = app.voice || { state: 'idle' };
+    var can = G.voice.supported();
+    var h = '<div class="vbar"><div class="vrow">';
+    if (can) h += '<button class="mic' + (v.state === 'listening' ? ' on' : '') + '" data-a="mic" aria-label="Say what you want to do">🎤</button>';
+    h += '<input id="vtext" class="vin" placeholder="' + (can ? 'Say it or type it' : 'Type what you would do') + '" autocomplete="off" value="' + esc(app.vtyped || '') + '"><button class="btn small" data-a="vsend">Go</button></div>';
+    if (v.state === 'listening') h += '<p class="note">Listening…</p>';
+    else if (v.state === 'heard') {
+      h += '<p class="note">I heard “' + esc(v.heard) + '”.</p>';
+      if (v.matches && v.matches.length) h += '<div class="acts">' + v.matches.map(function (m, i) { return '<button class="act vyes" data-a="vdo:' + i + '">Do this: ' + esc(m.label) + '</button>'; }).join('') + '</div>';
+      else h += '<p class="note">I could not match that to anything here. Try other words, or pick from the list.</p>';
+    } else if (v.state === 'error') h += '<p class="note">' + esc(v.msg) + '</p>';
+    return h + '</div>';
+  }
+  function sayText(text) {
+    text = String(text || '').trim();
+    if (!text) return;
+    app.vtyped = text;
+    app.voice = { state: 'heard', heard: text, matches: G.voice.match(text, voiceItems(app.S)) };
+    render();
+  }
+  var VERR = {
+    denied: 'The microphone is blocked. Allow it in your phone settings, or type instead.',
+    none: 'I did not catch that. Try again, or type it.',
+    error: 'Voice did not work just now. You can type instead.',
+    unsupported: 'Voice is not available here. You can type instead.'
+  };
+  function startMic() {
+    app.voice = { state: 'listening' };
+    render();
+    G.voice.listen(function (err, text) {
+      if (err) app.voice = { state: 'error', msg: VERR[err] || VERR.error };
+      else { app.vtyped = text; app.voice = { state: 'heard', heard: text, matches: G.voice.match(text, voiceItems(app.S)) }; }
+      render();
+    });
+  }
+  function cbMic() {
+    cb.micMap = function () {
+      if (!G.voice.supported()) { flash('Voice is not available here.'); return; }
+      flash('Listening… say where to go');
+      G.voice.listen(function (err, text) {
+        if (err) { flash(VERR[err] || VERR.error); return; }
+        var where = G.world.goToText(text);
+        flash(where ? 'Heading to ' + where : 'Try saying "go to the beach" or "go to work".');
+      });
+    };
+  }
+
   // ---------- game panels ----------
   function cardHtml(s) {
     var v = G.view(s);
     if (!v || v.kind === 'free') return '';
     var h = '<div class="stagefoot">' + esc(G.stage(G.age(s))) + ' · ' + G.yr(s) + '</div>';
     if (v.kind === 'event') {
-      h += '<h3>' + esc(v.title) + '</h3><p>' + esc(v.text) + '</p><div class="choices">';
+      h += '<h3>' + esc(v.title) + '</h3><p>' + esc(v.text) + '</p>' + voiceBarHtml() + '<div class="choices">';
       v.choices.forEach(function (c, i) {
         h += '<button class="choice" data-a="choose:' + i + '"' + (c.disabled ? ' disabled' : '') + '><span>' + esc(c.label) + (c.hint ? '<small>' + esc(c.hint) + '</small>' : '') + '</span>' + (c.cost ? '<span class="cost">' + $(c.cost) + '</span>' : '') + '</button>';
       });
@@ -186,7 +254,7 @@
   function placeHtml(s) {
     var W = G.world, pid = app.place;
     if (pid === 'move') {
-      var h = '<h3>Move to another part of Miami</h3><p class="note">Rent changes with the area, and so does the kind of trouble that finds you.</p><div class="acts">';
+      var h = '<h3>Move to another part of Miami</h3><p class="note">Rent changes with the area, and so does the kind of trouble that finds you.</p>' + voiceBarHtml() + '<div class="acts">';
       G.AREA_ORDER.forEach(function (k) {
         var a = G.AREAS[k];
         h += '<button class="act" data-a="moveto:' + k + '"' + (k === s.area ? ' disabled' : '') + '>' + esc(a.name) + '<small>Rent about ' + $(a.rent) + (a.risk >= 3 ? ' · rough' : a.risk === 0 ? ' · calm' : '') + '</small></button>';
@@ -199,6 +267,7 @@
     var list = acts.filter(function (a) { return a.group !== 'reckless'; });
     var dark = acts.filter(function (a) { return a.group === 'reckless'; });
     var h2 = '<div class="stagefoot">' + esc(p.emoji + ' ' + p.label(s)) + '</div><h3>' + esc(p.label(s)) + '</h3><p>' + esc(p.blurb(s)) + '</p>';
+    h2 += voiceBarHtml();
     var out = '';
     if (list.length) out += '<div class="acts">' + list.map(actBtn(s, false)).join('') + '</div>';
     if (pid === 'realtor' && G.age(s) >= 18) out += '<div class="acts" style="margin-top:8px"><button class="act" data-a="move-open">Move to another part of Miami<small>Change where you live</small></button></div>';
@@ -289,10 +358,11 @@
 
   // ---------- render ----------
   var cb = {
-    openPlace: function (id) { app.place = id; saveSoon(); render(); },
+    openPlace: function (id) { app.place = id; app.voice = null; app.vtyped = ''; saveSoon(); render(); },
     changed: function () { app.place = null; saveSoon(); render(); },
     save: function () { saveSoon(); }
   };
+  cbMic();
   function render() {
     layout();
     if (app.screen === 'boot') { root.innerHTML = '<div class="start"><div class="brand">Life <span>Choices</span></div></div>'; return; }
@@ -316,6 +386,8 @@
   }
   function after() {
     app.place = null;
+    app.voice = null;
+    app.vtyped = '';
     app.tab = 'world';
     saveSoon();
     render();
@@ -325,11 +397,13 @@
   root.addEventListener('click', function (ev) {
     var el = ev.target.closest('[data-a]');
     if (!el) return;
-    var a = el.getAttribute('data-a');
+    handle(el.getAttribute('data-a'), el, ev);
+  });
+  function handle(a, el, ev) {
     var s = app.S;
     var p = a.split(':');
     var cmd = p[0], arg = p.slice(1).join(':');
-    if (cmd === 'modal-bg') { if (ev.target === el) { app.modal = null; render(); } return; }
+    if (cmd === 'modal-bg') { if (ev && ev.target === el) { app.modal = null; render(); } return; }
     if (cmd === 'dark') { app.darkOpen = !app.darkOpen; return; }
     if (cmd === 'preset') { if (!locked()) beginLife(Object.assign({}, G.PRESETS[+arg].spec)); return; }
     if (cmd === 'custom') { app.custom = true; render(); return; }
@@ -341,14 +415,25 @@
     if (cmd === 'close') { app.modal = null; render(); return; }
     if (cmd === 'tab') { app.tab = arg; render(); window.scrollTo(0, 0); return; }
     if (!s) return;
-    if (cmd === 'place-close') { app.place = null; render(); return; }
-    if (cmd === 'move-open') { app.place = 'move'; render(); return; }
+    if (cmd === 'mic') { startMic(); return; }
+    if (cmd === 'vsend') { var inp = document.getElementById('vtext'); sayText(inp ? inp.value : app.vtyped); return; }
+    if (cmd === 'vdo') {
+      var mm = app.voice && app.voice.matches && app.voice.matches[+arg];
+      app.voice = null; app.vtyped = '';
+      if (mm) handle(mm.cmd, null, null);
+      return;
+    }
+    if (cmd === 'place-close') { app.place = null; app.voice = null; render(); return; }
+    if (cmd === 'move-open') { app.place = 'move'; app.voice = null; render(); return; }
     if (cmd === 'moveto') { if (G.moveTo(s, arg)) after(); return; }
     if (cmd === 'pact') { if (G.doAction(s, arg)) after(); return; }
     if (cmd === 'choose') { if (G.choose(s, +arg)) after(); else flash('You cannot afford that.'); return; }
     if (cmd === 'next') { G.next(s); after(); return; }
+  }
+  root.addEventListener('input', function (ev) { if (ev.target && ev.target.id === 'vtext') app.vtyped = ev.target.value; });
+  root.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' && ev.target && ev.target.id === 'vtext') { ev.preventDefault(); sayText(ev.target.value); }
   });
-  root.addEventListener('input', function () { });
   root.addEventListener('change', function (ev) {
     if (app.screen === 'start' && app.custom && ev.target.closest('.form')) { readForm(); render(); }
   });
