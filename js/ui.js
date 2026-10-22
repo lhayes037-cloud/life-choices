@@ -187,7 +187,7 @@
     else if (v.state === 'heard') {
       h += '<p class="note">I heard “' + esc(v.heard) + '”.</p>';
       if (v.matches && v.matches.length) h += '<div class="acts">' + v.matches.map(function (m, i) { return '<button class="act vyes" data-a="vdo:' + i + '">Do this: ' + esc(m.label) + '</button>'; }).join('') + '</div>';
-      else h += '<p class="note">I could not match that to anything here. Try other words, or pick from the list.</p>';
+      else h += '<p class="note vno"><b>I can\'t do that one yet.</b> Nothing here fits “' + esc(v.heard) + '”. I saved it so it can be added in a later update. For now, pick from the list below.</p>';
     } else if (v.state === 'error') h += '<p class="note">' + esc(v.msg) + '</p>';
     return h + '</div>';
   }
@@ -196,7 +196,15 @@
     if (!text) return;
     app.vtyped = text;
     app.voice = { state: 'heard', heard: text, matches: G.voice.match(text, voiceItems(app.S)) };
+    if (!app.voice.matches.length) {
+      try {
+        var tried = JSON.parse(localStorage.getItem('ml_tried') || '[]');
+        tried.push({ text: text.slice(0, 200), age: G.age(app.S), at: Date.now() });
+        localStorage.setItem('ml_tried', JSON.stringify(tried.slice(-200)));
+      } catch (e) { /* ignore */ }
+    }
     render();
+    try { var n = document.querySelector('.vno'); if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
   }
   var VERR = {
     denied: 'The microphone is blocked. Allow it in your phone settings, or type instead.',
